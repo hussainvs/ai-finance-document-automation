@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="860" viewBox="0 0 1400 860" role="img" aria-labelledby="title desc">
+<title id="title">Boost Grow AI Finance Automation Architecture</title>
+<desc id="desc">Document processing pipeline and separate QA evaluator pipeline.</desc>
+<defs>
+  <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6 Z" fill="#53657a"/></marker>
+  <style>
+    .bg{fill:#f7f9fc}.title{font:700 30px Inter,Arial,sans-serif;fill:#17243a}.subtitle{font:400 15px Inter,Arial,sans-serif;fill:#5b6b80}
+    .lane{fill:#fff;stroke:#d6deea;stroke-width:1.5;rx:18}.lanehead{font:700 19px Inter,Arial,sans-serif;fill:#1d314d}
+    .node{fill:#f2f7ff;stroke:#8aa8d2;stroke-width:1.5;rx:12}.decision{fill:#fff6e8;stroke:#d6a454;stroke-width:1.5}.review{fill:#fff1f0;stroke:#d58a84;stroke-width:1.5;rx:12}.success{fill:#edf9f1;stroke:#7cb992;stroke-width:1.5;rx:12}
+    .label{font:600 14px Inter,Arial,sans-serif;fill:#20344f;text-anchor:middle}.small{font:400 12px Inter,Arial,sans-serif;fill:#53657a;text-anchor:middle}.arrow{stroke:#53657a;stroke-width:2.4;fill:none;marker-end:url(#arrow)}.tag{font:700 11px Inter,Arial,sans-serif;fill:#53657a}
+  </style>
+</defs>
+<rect class="bg" width="1400" height="860"/>
+<text x="58" y="52" class="title">Boost Grow AI Finance Automation</text>
+<text x="58" y="80" class="subtitle">n8n workflow · AI-assisted extraction · deterministic validation · human review · separate QA evaluation</text>
+<rect x="40" y="110" width="1320" height="430" class="lane"/>
+<text x="65" y="146" class="lanehead">A. Finance document processing</text>
+<!-- Processing top row -->
+<rect x="75" y="185" width="170" height="75" class="node"/><text x="160" y="214" class="label"><tspan x="160">Google Drive</tspan><tspan x="160" dy="19">Unprocessed</tspan></text>
+<rect x="295" y="185" width="160" height="75" class="node"/><text x="375" y="214" class="label"><tspan x="375">Sort + download</tspan><tspan x="375" dy="19" class="small">Repeatable order</tspan></text>
+<rect x="505" y="185" width="175" height="75" class="node"/><text x="592" y="214" class="label"><tspan x="592">PDF / image path</tspan><tspan x="592" dy="19" class="small">Text extraction / vision</tspan></text>
+<rect x="730" y="185" width="185" height="75" class="node"/><text x="822" y="214" class="label"><tspan x="822">AI field extraction</tspan><tspan x="822" dy="19" class="small">Party, date, number, totals</tspan></text>
+<rect x="965" y="185" width="165" height="75" class="node"/><text x="1047" y="214" class="label"><tspan x="1047">Quality checks</tspan><tspan x="1047" dy="19" class="small">Required fields / type</tspan></text>
+<rect x="1180" y="185" width="145" height="75" class="node"/><text x="1252" y="214" class="label"><tspan x="1252">Existing-record</tspan><tspan x="1252" dy="19">lookup</tspan></text>
+<path d="M245 222 H295 M455 222 H505 M680 222 H730 M915 222 H965 M1130 222 H1180" class="arrow"/>
+<!-- Decision -->
+<path d="M1252 260 V300 H890 V324" class="arrow"/>
+<path d="M890 324 L970 365 L890 406 L810 365 Z" class="decision"/><text x="890" y="360" class="label"><tspan x="890">Safe to</tspan><tspan x="890" dy="18">auto-post?</tspan></text>
+<path d="M810 365 H620 V412" class="arrow"/><text x="710" y="351" class="tag">No</text>
+<rect x="520" y="412" width="200" height="76" class="review"/><text x="620" y="439" class="label"><tspan x="620">Review log + email</tspan><tspan x="620" dy="18" class="small">Explain exception</tspan><tspan x="620" dy="16" class="small">Move to Needs Review</tspan></text>
+<path d="M970 365 H1120 V412" class="arrow"/><text x="1034" y="350" class="tag">Yes</text>
+<rect x="1020" y="412" width="205" height="76" class="success"/><text x="1122" y="439" class="label"><tspan x="1122">Write Income / Expenses</tspan><tspan x="1122" dy="18" class="small">Then move to Processed</tspan><tspan x="1122" dy="16" class="small">Keep row + file consistent</tspan></text>
+<text x="75" y="505" class="small" text-anchor="start">Invariant: a file routed to review/rejected must not create a new ledger row in that processing attempt.</text>
+<!-- evaluator lane -->
+<rect x="40" y="570" width="1320" height="250" class="lane"/>
+<text x="65" y="607" class="lanehead">B. Independent QA evaluator — reads and compares; does not reprocess invoices</text>
+<rect x="80" y="650" width="230" height="95" class="node"/><text x="195" y="681" class="label"><tspan x="195">Read expected data</tspan><tspan x="195" dy="20" class="small">Manifest + read-only</tspan><tspan x="195" dy="16" class="small">Ground Truth</tspan></text>
+<rect x="370" y="650" width="250" height="95" class="node"/><text x="495" y="681" class="label"><tspan x="495">Read actual state</tspan><tspan x="495" dy="20" class="small">Sheets + Drive folders</tspan><tspan x="495" dy="16" class="small">+ review emails</tspan></text>
+<rect x="680" y="650" width="220" height="95" class="decision"/><text x="790" y="686" class="label"><tspan x="790">Compare per case</tspan><tspan x="790" dy="20" class="small">Route, fields, row delta,</tspan><tspan x="790" dy="16" class="small">review evidence</tspan></text>
+<rect x="960" y="650" width="170" height="95" class="success"/><text x="1045" y="686" class="label"><tspan x="1045">Update Manifest</tspan><tspan x="1045" dy="20" class="small">Pass / fail detail</tspan></text>
+<rect x="1180" y="650" width="145" height="95" class="node"/><text x="1252" y="686" class="label"><tspan x="1252">Append Test</tspan><tspan x="1252" dy="20">Log</tspan></text>
+<path d="M310 697 H370 M620 697 H680 M900 697 H960 M1130 697 H1180" class="arrow"/>
+<text x="65" y="785" class="small" text-anchor="start">Trustworthy tests require a controlled before-state, unique run ID, row-count evidence and immutable expected results.</text>
+</svg>

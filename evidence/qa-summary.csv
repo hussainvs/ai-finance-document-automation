@@ -1,0 +1,26 @@
+﻿case_id,scenario,observed_route,strict_result,observed_mismatch,priority_note
+001,clear income invoice,income,PASS,None,Normal path
+002,multi-page income invoice,income,PASS,None,Normal path
+003,income invoice image,income,PASS,None,Normal path
+004,income invoice JPG,income,PASS,None,Normal path
+005,multi-line income invoice,income,PASS,None,Normal path
+006,valid SaaS expense seed,review,FAIL,Route mismatch; sent to review instead of target Expenses route,P2 routing; clean seed needed
+007,freelancer expense image,expense,PASS,None,Normal path
+008,ad platform receipt,expense,FAIL,Vendor label differed from expected normalized value,P2 extraction
+009,utility invoice with tax,expense,PASS,None,Normal path
+010,rent invoice without invoice number,expense,PASS,None,Optional invoice number preserved
+011,missing party name,review,PASS,None,Exception path
+012,missing invoice date,review,PASS,None,Exception path
+013,missing total amount,review,PASS,None,Exception path
+014,low-contrast scan,expense,PASS,None,Fields matched expected baseline
+015,ambiguous transaction direction,review,PASS,None,Exception path
+016,"service agreement, not invoice",review,PASS,None,Exception path
+017,exact PDF duplicate,review,PASS,None,Duplicate detection scenario
+018,"same invoice number, conflicting party/amount",review,FAIL,Historical linked ledger row overlaps later review log; clean retest needed,P1 integrity; state contaminated
+019,"same vendor/amount, new invoice number",review,FAIL,Near-match routed to review; historical ledger row overlaps later review log,P1 integrity/false positive; state contaminated
+020,cross-format JPG duplicate,review,FAIL,Historical linked ledger row overlaps later review log; clean retest needed,P1 duplicate prevention; state contaminated
+021,unsupported ZIP,review,PASS,None,Exception path
+022,unsupported DOCX,review,PASS,None,Exception path
+023,unsupported TXT,review,PASS,None,Exception path
+024,unsupported CSV,review,PASS,None,Exception path
+025,mobile photo receipt category,expense,FAIL,Category differs from expected policy,P2 categorization
