@@ -1,0 +1,1249 @@
+{
+  "name": "Boost Grow QA Evaluator - Auto Read",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Boost Grow QA Evaluation",
+        "formDescription": "No JSON required. First process one batch of synthetic QA documents through the Finance Agent. Then submit this form to read Income, Expenses, Review Log, Drive processing folders, reviewer emails and the read-only Ground Truth. The evaluator does not process or move files; it only updates the QA Manifest and Test Log. Run Batch 1 first so the canonical invoice exists before duplicate tests. Do not use live customer invoices.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Batch to evaluate",
+              "fieldType": "dropdown",
+              "fieldName": "batch_filter",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Batch 1 - baseline"
+                  },
+                  {
+                    "option": "Batch 2 - exceptions"
+                  },
+                  {
+                    "option": "Batch 3 - duplicate tests"
+                  },
+                  {
+                    "option": "Batch 4 - unsupported and photo"
+                  },
+                  {
+                    "option": "All batches"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Run ID (optional)",
+              "fieldName": "run_id",
+              "placeholder": "e.g. BG-QA-20261119-B1"
+            },
+            {
+              "fieldLabel": "Manual handling time per document in minutes (optional)",
+              "fieldType": "number",
+              "fieldName": "manual_minutes_per_document",
+              "placeholder": "Use your stopwatch baseline, e.g. 5"
+            },
+            {
+              "fieldLabel": "Human effort per document after automation in minutes (optional)",
+              "fieldType": "number",
+              "fieldName": "human_minutes_per_document",
+              "placeholder": "Measured review/correction time, e.g. 1"
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "appendAttribution": false,
+          "buttonLabel": "Run automatic QA checks",
+          "path": "boost-grow-qa-evaluator",
+          "ignoreBots": true
+        }
+      },
+      "id": "ddcf3733-8e9f-4d01-8b3f-29193800e8e8",
+      "name": "Start QA Evaluation",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        -48
+      ],
+      "webhookId": "829b1cf5-694b-4ea0-b54e-e026dc4cd760"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "JzNIbAJQgnjVqpBS",
+          "cachedResultName": "BoostGrow_QA_Manifest"
+        },
+        "filters": {
+          "conditions": []
+        },
+        "returnAll": true
+      },
+      "id": "298613a2-44a8-42a3-8482-333e20f154f9",
+      "name": "Load QA Manifest",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const form = $(\"Start QA Evaluation\").first().json || {};\nconst allManifests = $(\"Load QA Manifest\").all().map(x => x.json || {});\nconst selectedBatch = String(form.batch_filter || \"All batches\");\nconst manifests = selectedBatch === \"All batches\" ? allManifests : allManifests.filter(m => String(m.recommended_batch || \"\") === selectedBatch);\nif (!manifests.length) throw new Error(\"No manifest cases found for selected batch: \" + selectedBatch);\nconst truths = $(\"Load Ground Truth (Read Only)\").all().map(x => x.json || {});\nconst incomeRows = $(\"Read QA Finance Income\").all().map(x => x.json || {}).filter(x => Object.keys(x).length);\nconst expenseRows = $(\"Read QA Finance Expenses\").all().map(x => x.json || {}).filter(x => Object.keys(x).length);\nconst reviewRows = $(\"Read QA Finance Review Log\").all().map(x => x.json || {}).filter(x => Object.keys(x).length);\nconst folderRecords = []\n  .concat($(\"Read QA Drive Unprocessed\").all().map(x => ({file:x.json||{}, location:\"Unprocessed\"})))\n  .concat($(\"Read QA Drive Processed\").all().map(x => ({file:x.json||{}, location:\"Processed\"})))\n  .concat($(\"Read QA Drive Needs Review\").all().map(x => ({file:x.json||{}, location:\"Needs Review\"})))\n  .concat($(\"Read QA Drive Rejected\").all().map(x => ({file:x.json||{}, location:\"Rejected\"})))\n  .filter(x => x.file && x.file.id && x.file.name);\nconst emails = $(\"Read QA Review Emails\").all().map(x => x.json || {}).filter(x => Object.keys(x).length);\nconst norm = v => String(v ?? \"\").trim().toLowerCase().replace(/[^a-z0-9]/g, \"\");\nconst blank = v => v === undefined || v === null || String(v).trim() === \"\" || [\"-\",\"n/a\",\"na\",\"not provided\",\"unknown\",\"null\"].includes(String(v).trim().toLowerCase());\nconst num = v => {\n  if (blank(v)) return null;\n  const n = Number(String(v).replace(/[$,\\s]/g, \"\"));\n  return Number.isFinite(n) ? n : null;\n};\nconst moneyEqual = (a,b) => {\n  const x = num(a), y = num(b);\n  return x !== null && y !== null && Math.abs(x-y) <= 0.01;\n};\nconst dateKey = v => {\n  if (blank(v)) return \"\";\n  const s = String(v).trim();\n  const iso = s.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})/);\n  if (iso) return iso[1] + \"-\" + String(iso[2]).padStart(2,\"0\") + \"-\" + String(iso[3]).padStart(2,\"0\");\n  const us = s.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);\n  if (us) return us[3] + \"-\" + String(us[1]).padStart(2,\"0\") + \"-\" + String(us[2]).padStart(2,\"0\");\n  const d = new Date(s);\n  return Number.isNaN(d.getTime()) ? norm(s) : d.getFullYear() + \"-\" + String(d.getMonth()+1).padStart(2,\"0\") + \"-\" + String(d.getDate()).padStart(2,\"0\");\n};\nconst fileIdFromLink = v => {\n  const s = String(v ?? \"\");\n  const a = s.match(/\\/d\\/([A-Za-z0-9_-]+)/);\n  if (a) return a[1];\n  const b = s.match(/[?&]id=([A-Za-z0-9_-]+)/);\n  if (b) return b[1];\n  const c = s.match(/[-A-Za-z0-9_]{25,}/);\n  return c ? c[0] : \"\";\n};\nconst isReal = x => x && Object.keys(x).some(k => !blank(x[k]));\nconst manifestMap = new Map(manifests.map(m => [String(m.case_id || \"\").padStart(2,\"0\"),m]));\nconst truthMap = new Map(truths.map(g => [String(g.case_id || \"\").padStart(2,\"0\"),g]));\nconst incomeRowsAll = incomeRows.map(r => ({...r, _sheet:\"Income\", _party:r.client ?? r.party_name ?? \"\"}));\nconst expenseRowsAll = expenseRows.map(r => ({...r, _sheet:\"Expenses\", _party:r.vendor ?? r.party_name ?? \"\"}));\nconst financeRows = incomeRowsAll.concat(expenseRowsAll);\nconst runStamp = new Date().toISOString().replace(/[-:.TZ]/g,\"\").slice(0,14);\nconst runId = String(form.run_id || (\"BG-QA-\" + runStamp));\nconst manualPerDoc = num(form.manual_minutes_per_document);\nconst humanPerDoc = num(form.human_minutes_per_document);\nconst reasonRules = {\n \"11\": /party|vendor|supplier|name|missing/i,\n \"12\": /invoice date|issue date|date|missing/i,\n \"13\": /total|amount|pricing|missing/i,\n \"14\": /confidence|uncertain|unclear|scan|ocr|blurry|read|image/i,\n \"15\": /direction|transaction|income|expense|unclear|uncertain|type/i,\n \"16\": /not.{0,12}invoice|service agreement|document type|invoice/i,\n \"17\": /duplicate|already logged|already exists|same invoice/i,\n \"18\": /invoice number|same number|duplicate|conflict|collision/i,\n \"20\": /duplicate|already logged|already exists|same invoice/i,\n \"21\": /unsupported|file type|zip|archive/i,\n \"22\": /unsupported|file type|docx|word/i,\n \"23\": /unsupported|file type|txt|text/i,\n \"24\": /unsupported|file type|csv/i\n};\nconst findReviewEmail = filename => {\n const target = norm(filename);\n const matches = emails.filter(e => norm([e.subject,e.text,e.html,e.snippet].join(\" \")).includes(target));\n matches.sort((a,b) => Number(b.internalDate || 0) - Number(a.internalDate || 0));\n return matches[0] || null;\n};\nconst getMailBody = e => e ? [e.subject,e.text,e.html,e.snippet].filter(Boolean).join(\"\\n\").replace(/<[^>]*>/g,\" \").replace(/&nbsp;/g,\" \").replace(/&amp;/g,\"&\") : \"\";\nconst findField = (row, names) => {\n for (const name of names) if (row[name] !== undefined && row[name] !== null) return row[name];\n return \"\";\n};\nreturn manifests.map(m => {\n const id = String(m.case_id || \"\").padStart(2,\"0\");\n const g = truthMap.get(id);\n const bad = [];\n const evidence = [];\n if (!g) {\n   return {json:{run_id:runId,timestamp:new Date().toISOString(),case_id:id,batch:m.recommended_batch||\"\",filename:m.filename||\"\",expected_route:m.expected_route||\"\",actual_route:\"\",actual_result:\"\",pass_fail:\"FAIL\",execution_id:\"\",notes:\"Missing case from read-only Ground Truth table.\",mismatch_summary:\"Ground truth row not found.\",review_reason_correct:null,duplicate_behavior_correct:null,actual_row_delta:null,review_reason:\"\",manual_minutes:null,human_minutes_after_automation:null,automation_elapsed_seconds:null,estimated_minutes_saved:null}};\n }\n const matchingFiles = folderRecords.filter(x => String(x.file.name || \"\") === String(m.filename || \"\"));\n const locations = Array.from(new Set(matchingFiles.map(x => x.location)));\n const file = matchingFiles.length ? matchingFiles[0].file : null;\n if (!file) evidence.push(\"Test file not found in Unprocessed, Processed, Needs Review or Rejected Drive folders.\");\n if (locations.length > 1) evidence.push(\"Same test filename appears in multiple folders: \" + locations.join(\", \"));\n if (locations.length === 1 && locations[0] === \"Unprocessed\") evidence.push(\"File is still Unprocessed; the finance workflow has not completed this case yet.\");\n const rowMatchesFile = row => {\n   if (!file) return false;\n   const link = String(row.file_link || \"\");\n   const rid = fileIdFromLink(link);\n   return (!!rid && rid === String(file.id)) || (!!file.webViewLink && link === file.webViewLink) || (!!file.webViewLink && link.includes(file.webViewLink));\n };\n const linkedIncome = incomeRowsAll.filter(rowMatchesFile);\n const linkedExpense = expenseRowsAll.filter(rowMatchesFile);\n let linkedRows = linkedIncome.concat(linkedExpense);\n let row = linkedRows.length ? linkedRows[0] : null;\n const targetType = String(g.transaction_type || \"\").toLowerCase();\n const expectedDelta = num(m.expected_row_delta);\n const expectedNewRow = typeof g.expected_new_financial_row === \"boolean\" ? g.expected_new_financial_row : (expectedDelta === null ? null : expectedDelta > 0);\n if (!row && expectedNewRow === true) {\n   const invoice = norm(g.invoice_number);\n   const party = norm(g.party_name);\n   const total = num(g.total_amount);\n   const targetRows = targetType === \"income\" ? incomeRowsAll : targetType === \"expense\" ? expenseRowsAll : financeRows;\n   const candidates = targetRows.filter(r => {\n     const rInvoice = norm(r.invoice_number);\n     const rParty = norm(r._party);\n     const partyMatch = party && rParty === party;\n     const invoiceMatch = invoice ? rInvoice === invoice : true;\n     const totalMatch = total === null ? true : moneyEqual(r.total_usd, total);\n     const dateMatch = blank(g.invoice_date) || dateKey(r.date) === dateKey(g.invoice_date);\n     return invoiceMatch && partyMatch && totalMatch && dateMatch;\n   });\n   if (candidates.length === 1) row = candidates[0];\n   else if (candidates.length > 1) evidence.push(\"Could not uniquely link a finance row to this file; multiple rows match invoice/vendor/amount/date.\");\n }\n let actualRoute = \"\";\n // Trust the final Drive folder first. A finance row must not hide that the file was routed to review.\n if (locations.length > 1) actualRoute = \"ambiguous_location\";\n else if (locations[0] === \"Rejected\") actualRoute = \"reject\";\n else if (locations[0] === \"Needs Review\") actualRoute = \"review\";\n else if (linkedIncome.length && linkedExpense.length) actualRoute = \"duplicate_financial_entries\";\n else if (linkedIncome.length) actualRoute = \"income\";\n else if (linkedExpense.length) actualRoute = \"expense\";\n else if (row && row._sheet === \"Income\") actualRoute = \"income\";\n else if (row && row._sheet === \"Expenses\") actualRoute = \"expense\";\n else if (locations[0] === \"Unprocessed\") actualRoute = \"unprocessed\";\n else if (locations[0] === \"Processed\") actualRoute = \"processed_without_linked_row\";\n else actualRoute = \"not_found\";\n const location = locations.length === 1 ? locations[0] : locations.join(\" / \");\n const reviewEmail = findReviewEmail(m.filename || \"\");\n const reviewBody = getMailBody(reviewEmail);\n const aiNoteMatch = reviewBody.match(/AI note:\\s*([^\\r\\n<]*)/i);\n const missingMatch = reviewBody.match(/Missing fields:\\s*([^\\r\\n<]*)/i);\n const reviewReason = aiNoteMatch ? aiNoteMatch[1].trim() : \"\";\n const missingFromEmail = missingMatch ? missingMatch[1].trim() : \"\";\n const expectedRouteText = String(m.expected_route || m.target_behavior || \"\").toLowerCase().trim();\n // Only treat review as mandatory when it is the primary expected route.\n // \"Auto-process ... or review if uncertain\" and \"not duplicate\" are not review-required cases.\n const conditionalReview = /not\\\\s+(?:a\\\\s+)?duplicate|otherwise verify|if uncertain.{0,60}otherwise|auto[- ]?process.{0,100}\\\\bor\\\\b.{0,50}\\\\breview|review\\\\s+if\\\\s+(?:uncertain|needed|necessary)/i.test(expectedRouteText);\n const primaryReviewExpected = /^(?:human review|needs review|manual review|duplicate|unsupported|reject|hold for review)\\\\b/i.test(expectedRouteText);\n const reviewExpected = primaryReviewExpected && !conditionalReview;\n let reasonCorrect = null;\n const reasonRule = reasonRules[id];\n if (reasonRule && (reviewExpected || actualRoute === \"review\" || actualRoute === \"reject\")) {\n   if (!reviewEmail) evidence.push(\"Review-reason evidence unavailable: no matching review email was found in the connected Gmail account.\");\n   else {\n     const combined = reviewReason + \" \" + missingFromEmail + \" \" + reviewBody;\n     reasonCorrect = reasonRule.test(combined) && !blank(reviewReason) && reviewReason !== \"-\";\n     if (!reasonCorrect) bad.push(\"Human-review email did not contain a sufficiently specific reason for this case.\");\n   }\n }\n const fileWasFoundAndSettled = !!file && locations.length === 1 && locations[0] !== \"Unprocessed\";\n \n let routeCorrect = null;\n if (!fileWasFoundAndSettled) {\n   routeCorrect = null;\n } else if (id === \"14\" || id === \"25\") {\n   routeCorrect = actualRoute === \"expense\" || actualRoute === \"review\";\n } else if (id === \"16\") {\n   routeCorrect = actualRoute === \"review\" || actualRoute === \"reject\";\n } else if (reviewExpected) {\n   routeCorrect = actualRoute === \"review\" || actualRoute === \"reject\";\n } else if (expectedRouteText.includes(\"income\")) {\n   routeCorrect = actualRoute === \"income\";\n } else if (expectedRouteText.includes(\"expense\")) {\n   routeCorrect = actualRoute === \"expense\";\n }\n if (routeCorrect === false) bad.push(\"Unexpected final route/location. Expected: \" + m.expected_route + \"; actual route: \" + actualRoute + \"; Drive folder: \" + (location || \"not found\") + \".\");\n if (actualRoute === \"processed_without_linked_row\" && expectedNewRow !== false) bad.push(\"File is in Processed but no finance row can be linked to it.\");\n if (linkedRows.length > 1) bad.push(\"More than one finance row links to the same test file.\");\n if (expectedNewRow === true && linkedRows.length === 0 && !row) {\n   if (actualRoute === \"review\" || actualRoute === \"reject\") bad.push(\"Expected a financial row for this case, but the document ended in a review/rejection folder.\");\n   else if (fileWasFoundAndSettled) bad.push(\"Expected one financial row, but no matching row was found.\");\n }\n if (expectedNewRow === false && linkedRows.length > 0) bad.push(\"This test case must not create a new financial row, but a row links to its file.\");\n if (row && expectedNewRow !== false) {\n   const actualParty = findField(row, [\"client\",\"vendor\",\"party_name\"]);\n   if (!blank(g.party_name) && norm(actualParty) !== norm(g.party_name)) bad.push(\"Party/vendor mismatch: expected [\" + g.party_name + \"], got [\" + actualParty + \"].\");\n   const expectedInvoice = norm(g.invoice_number);\n   const actualInvoice = norm(row.invoice_number);\n   if (expectedInvoice !== actualInvoice) bad.push(\"Invoice number mismatch: expected [\" + (g.invoice_number || \"blank\") + \"], got [\" + (row.invoice_number || \"blank\") + \"].\");\n   if (!blank(g.invoice_date) && dateKey(row.date) !== dateKey(g.invoice_date)) bad.push(\"Invoice date mismatch: expected \" + g.invoice_date + \", got \" + (row.date || \"blank\") + \".\");\n   if (!blank(g.category) && norm(row.category) !== norm(g.category)) bad.push(\"Category mismatch: expected [\" + g.category + \"], got [\" + (row.category || \"blank\") + \"].\");\n   if (num(g.total_amount) !== null && !moneyEqual(row.total_usd, g.total_amount)) bad.push(\"Total mismatch: expected \" + g.total_amount + \", got \" + (row.total_usd ?? \"blank\") + \".\");\n   if (num(g.amount_ex_tax) !== null && !moneyEqual(row.amount_ex_tax, g.amount_ex_tax)) bad.push(\"Pre-tax amount mismatch: expected \" + g.amount_ex_tax + \", got \" + (row.amount_ex_tax ?? \"blank\") + \".\");\n   if (num(g.tax_amount) !== null && !moneyEqual(row.tax, g.tax_amount)) bad.push(\"Tax mismatch: expected \" + g.tax_amount + \", got \" + (row.tax ?? \"blank\") + \".\");\n   if (targetType === \"income\" && row._sheet !== \"Income\") bad.push(\"Income document was written to Expenses.\");\n   if (targetType === \"expense\" && row._sheet !== \"Expenses\") bad.push(\"Expense document was written to Income.\");\n }\n let duplicateCorrect = null;\n if (id === \"17\" || id === \"20\") {\n   const canonical = expenseRowsAll.filter(r => norm(r.invoice_number) === norm(\"CD-2026-7714\") && norm(r._party) === norm(\"CloudDesk Software, Inc.\") && moneyEqual(r.total_usd,178));\n   if (canonical.length === 0) evidence.push(\"Duplicate check depends on case 06 being processed first; canonical expense row is not yet present.\");\n   else {\n     duplicateCorrect = canonical.length === 1 && actualRoute === \"review\" && linkedRows.length === 0;\n     if (!duplicateCorrect) bad.push(\"Exact duplicate should be held for review and must not create a second finance row; matching canonical rows found: \" + canonical.length + \".\");\n   }\n }\n if (id === \"18\") {\n   const conflictRows = expenseRowsAll.concat(incomeRowsAll).filter(r => norm(r.invoice_number) === norm(\"CD-2026-7714\") && norm(r._party) === norm(\"Orbital Workspace Inc.\") && moneyEqual(r.total_usd,89.99));\n   duplicateCorrect = conflictRows.length === 0 && actualRoute === \"review\" && linkedRows.length === 0;\n   if (!duplicateCorrect) bad.push(\"Invoice-number conflict should be held for review without logging the conflicting vendor/amount.\");\n }\n if (id === \"19\") {\n   const nearMatches = expenseRowsAll.filter(r => norm(r.invoice_number) === norm(\"CD-2026-7715\") && norm(r._party) === norm(\"CloudDesk Software, Inc.\") && moneyEqual(r.total_usd,178));\n   duplicateCorrect = nearMatches.length === 1 && actualRoute === \"expense\";\n   if (!duplicateCorrect && fileWasFoundAndSettled) bad.push(\"Near-match with a different invoice number should be logged exactly once as an expense.\");\n }\n if (actualRoute === \"reject\") {\n   const rejectionLogged = reviewRows.some(r => norm(r.file_name) === norm(m.filename) && norm(r.decision) === \"reject\");\n   if (!rejectionLogged) bad.push(\"File is in Rejected but Review Log has no matching Reject decision.\");\n }\n if ((reviewExpected || actualRoute === \"review\" || actualRoute === \"reject\") && (actualRoute === \"review\" || actualRoute === \"reject\") && !reviewEmail && fileWasFoundAndSettled) bad.push(\"Document was routed for review/rejection, but no matching reviewer email was found.\");\n if ((actualRoute === \"review\" || actualRoute === \"reject\") && linkedRows.length > 0) bad.push(\"Document is in a review/rejection folder but also has a linked financial row; possible incorrect posting.\");\n if (reviewExpected && (actualRoute === \"income\" || actualRoute === \"expense\") && linkedRows.length > 0) {\n   evidence.push(\"This review-path case ended in a financial sheet. The current workflow does not record approvals in Review Log, so the evaluator cannot prove that a human approved it rather than the AI auto-posting it.\");\n }\n const actualDelta = linkedRows.length || (row && expectedNewRow === true ? 1 : 0);\n const status = bad.length ? \"FAIL\" : evidence.length ? \"INCOMPLETE\" : \"PASS\";\n const actualSummary = \"route=\" + actualRoute + \"; folder=\" + (location || \"not found\") + \"; party=\" + (row ? findField(row,[\"client\",\"vendor\",\"party_name\"]) : \"\") + \"; invoice=\" + (row ? row.invoice_number || \"\" : \"\") + \"; date=\" + (row ? row.date || \"\" : \"\") + \"; category=\" + (row ? row.category || \"\" : \"\") + \"; total=\" + (row ? row.total_usd ?? \"\" : \"\") + \"; review_email_found=\" + !!reviewEmail;\n const notes = [\n   reviewEmail ? (\"Review email found: \" + (reviewEmail.subject || m.filename)) : \"\",\n   reasonRule && reviewReason ? (\"AI note: \" + reviewReason) : \"\",\n   evidence.length ? (\"Evidence gaps: \" + evidence.join(\"; \")) : \"\"\n ].filter(Boolean).join(\" | \");\n const completed = status !== \"INCOMPLETE\" && actualRoute !== \"unprocessed\" && actualRoute !== \"not_found\" && actualRoute !== \"ambiguous_location\";\n const manualMinutes = completed ? manualPerDoc : null;\n const humanMinutes = completed ? humanPerDoc : null;\n const saved = manualMinutes !== null && humanMinutes !== null ? Math.round((manualMinutes-humanMinutes)*100)/100 : null;\n return {json:{\n   run_id:runId,\n   timestamp:new Date().toISOString(),\n   case_id:id,\n   batch:m.recommended_batch||\"\",\n   filename:m.filename||\"\",\n   expected_route:m.expected_route||\"\",\n   actual_route:actualRoute,\n   actual_result_summary:actualSummary,\n   pass_fail:status,\n   execution_id:\"\",\n   notes,\n   mismatch_summary:bad.concat(evidence.map(x=>\"Evidence missing: \"+x)).join(\" | \"),\n   expected_total_usd:num(g.total_amount),\n   actual_total_usd:row?num(row.total_usd):null,\n   expected_party_name:g.party_name||\"\",\n   actual_party_name:row?findField(row,[\"client\",\"vendor\",\"party_name\"]):\"\",\n   expected_invoice_number:g.invoice_number||\"\",\n   actual_invoice_number:row?row.invoice_number||\"\":\"\",\n   review_reason_correct:reasonCorrect,\n   duplicate_behavior_correct:duplicateCorrect,\n   sheet_row_count_before:null,\n   sheet_row_count_after:null,\n   actual_row_delta:actualDelta,\n   drive_folder_after:location,\n   review_reason:reviewReason,\n   manual_minutes:manualMinutes,\n   human_minutes_after_automation:humanMinutes,\n   automation_elapsed_seconds:null,\n   estimated_minutes_saved:saved,\n   mismatches:bad.concat(evidence.map(x=>\"Evidence missing: \"+x)).join(\" | \")\n }};\n});"
+      },
+      "id": "0f9fdeb4-55b9-452c-8f0c-f00b96f4ac29",
+      "name": "Compare Results Against Ground Truth",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "JzNIbAJQgnjVqpBS",
+          "cachedResultName": "BoostGrow_QA_Manifest"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "case_id",
+              "keyValue": "={{ $json.case_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "case_id": "={{ $json.case_id }}",
+            "actual_route": "={{ $json.actual_route }}",
+            "actual_result": "={{ $json.actual_result_summary }}",
+            "pass_fail": "={{ $json.pass_fail }}",
+            "execution_id": "={{ $json.execution_id }}",
+            "notes": "={{ $json.notes }}",
+            "mismatch_summary": "={{ $json.mismatch_summary }}"
+          },
+          "matchingColumns": [
+            "case_id"
+          ],
+          "schema": [
+            {
+              "id": "case_id",
+              "displayName": "case_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "filename",
+              "displayName": "filename",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "format",
+              "displayName": "format",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "recommended_batch",
+              "displayName": "recommended_batch",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "scenario",
+              "displayName": "scenario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "document_setup",
+              "displayName": "document_setup",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "target_behavior",
+              "displayName": "target_behavior",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "pass_criteria",
+              "displayName": "pass_criteria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "known_risk_or_note",
+              "displayName": "known_risk_or_note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "actual_route",
+              "displayName": "actual_route",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "actual_result",
+              "displayName": "actual_result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "pass_fail",
+              "displayName": "pass_fail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "mismatch_summary",
+              "displayName": "mismatch_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expected_route",
+              "displayName": "expected_route",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expected_row_delta",
+              "displayName": "expected_row_delta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "0bbb6ba2-fe72-44fe-9ec4-e399e0e7627e",
+      "name": "Update QA Manifest",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2864,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "CZq0aCUB5XyyzoRE",
+          "cachedResultName": "BoostGrow_QA_TestLog"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id": "={{ $(\"Compare Results Against Ground Truth\").item.json.run_id }}",
+            "timestamp": "={{ $(\"Compare Results Against Ground Truth\").item.json.timestamp }}",
+            "case_id": "={{ $(\"Compare Results Against Ground Truth\").item.json.case_id }}",
+            "batch": "={{ $(\"Compare Results Against Ground Truth\").item.json.batch }}",
+            "filename": "={{ $(\"Compare Results Against Ground Truth\").item.json.filename }}",
+            "expected_route": "={{ $(\"Compare Results Against Ground Truth\").item.json.expected_route }}",
+            "actual_route": "={{ $(\"Compare Results Against Ground Truth\").item.json.actual_route }}",
+            "expected_total_usd": "={{ $(\"Compare Results Against Ground Truth\").item.json.expected_total_usd }}",
+            "actual_total_usd": "={{ $(\"Compare Results Against Ground Truth\").item.json.actual_total_usd }}",
+            "expected_party_name": "={{ $(\"Compare Results Against Ground Truth\").item.json.expected_party_name }}",
+            "actual_party_name": "={{ $(\"Compare Results Against Ground Truth\").item.json.actual_party_name }}",
+            "expected_invoice_number": "={{ $(\"Compare Results Against Ground Truth\").item.json.expected_invoice_number }}",
+            "actual_invoice_number": "={{ $(\"Compare Results Against Ground Truth\").item.json.actual_invoice_number }}",
+            "review_reason_correct": "={{ $(\"Compare Results Against Ground Truth\").item.json.review_reason_correct }}",
+            "duplicate_behavior_correct": "={{ $(\"Compare Results Against Ground Truth\").item.json.duplicate_behavior_correct }}",
+            "sheet_row_count_before": "={{ $(\"Compare Results Against Ground Truth\").item.json.sheet_row_count_before }}",
+            "sheet_row_count_after": "={{ $(\"Compare Results Against Ground Truth\").item.json.sheet_row_count_after }}",
+            "drive_folder_after": "={{ $(\"Compare Results Against Ground Truth\").item.json.drive_folder_after }}",
+            "execution_id": "={{ $(\"Compare Results Against Ground Truth\").item.json.execution_id }}",
+            "pass_fail": "={{ $(\"Compare Results Against Ground Truth\").item.json.pass_fail }}",
+            "notes": "={{ $(\"Compare Results Against Ground Truth\").item.json.notes }}",
+            "mismatches": "={{ $(\"Compare Results Against Ground Truth\").item.json.mismatches }}",
+            "actual_row_delta": "={{ $(\"Compare Results Against Ground Truth\").item.json.actual_row_delta }}",
+            "review_reason": "={{ $(\"Compare Results Against Ground Truth\").item.json.review_reason }}",
+            "manual_minutes": "={{ $(\"Compare Results Against Ground Truth\").item.json.manual_minutes }}",
+            "human_minutes_after_automation": "={{ $(\"Compare Results Against Ground Truth\").item.json.human_minutes_after_automation }}",
+            "automation_elapsed_seconds": "={{ $(\"Compare Results Against Ground Truth\").item.json.automation_elapsed_seconds }}",
+            "estimated_minutes_saved": "={{ $(\"Compare Results Against Ground Truth\").item.json.estimated_minutes_saved }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "run_id",
+              "displayName": "run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "case_id",
+              "displayName": "case_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "batch",
+              "displayName": "batch",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "filename",
+              "displayName": "filename",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expected_route",
+              "displayName": "expected_route",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "actual_route",
+              "displayName": "actual_route",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expected_total_usd",
+              "displayName": "expected_total_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "actual_total_usd",
+              "displayName": "actual_total_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expected_party_name",
+              "displayName": "expected_party_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "actual_party_name",
+              "displayName": "actual_party_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expected_invoice_number",
+              "displayName": "expected_invoice_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "actual_invoice_number",
+              "displayName": "actual_invoice_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "review_reason_correct",
+              "displayName": "review_reason_correct",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "duplicate_behavior_correct",
+              "displayName": "duplicate_behavior_correct",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sheet_row_count_before",
+              "displayName": "sheet_row_count_before",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sheet_row_count_after",
+              "displayName": "sheet_row_count_after",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "drive_folder_after",
+              "displayName": "drive_folder_after",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "pass_fail",
+              "displayName": "pass_fail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "mismatches",
+              "displayName": "mismatches",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "actual_row_delta",
+              "displayName": "actual_row_delta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "review_reason",
+              "displayName": "review_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "manual_minutes",
+              "displayName": "manual_minutes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "human_minutes_after_automation",
+              "displayName": "human_minutes_after_automation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "automation_elapsed_seconds",
+              "displayName": "automation_elapsed_seconds",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "estimated_minutes_saved",
+              "displayName": "estimated_minutes_saved",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "c14b454d-a817-4558-8680-f1b13c55c94a",
+      "name": "Append QA Test Log",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3088,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const r=$(\"Compare Results Against Ground Truth\").all().map(x=>x.json),count=s=>r.filter(x=>x.pass_fail===s).length,t=r.filter(x=>typeof x.manual_minutes===\"number\"&&typeof x.human_minutes_after_automation===\"number\"),manual=t.reduce((s,x)=>s+x.manual_minutes,0),human=t.reduce((s,x)=>s+x.human_minutes_after_automation,0),saved=manual-human;return[{json:{run_id:r[0]?.run_id||\"\",total_cases:r.length,passed:count(\"PASS\"),failed:count(\"FAIL\"),incomplete:count(\"INCOMPLETE\"),completion_rate_pct:r.length?Math.round(count(\"PASS\")/r.length*10000)/100:0,time_study_cases:t.length,measured_manual_minutes:Math.round(manual*100)/100,measured_human_minutes_after_automation:Math.round(human*100)/100,measured_human_minutes_saved:t.length?Math.round(saved*100)/100:null,measured_time_reduction_pct:t.length&&manual>0?Math.round(saved/manual*10000)/100:null,results:r.map(x=>({case_id:x.case_id,filename:x.filename,pass_fail:x.pass_fail,actual_route:x.actual_route,mismatches:x.mismatches}))}}];"
+      },
+      "id": "7078c0ff-168e-42e8-b504-5ae1d559848c",
+      "name": "Build QA Batch Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3312,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1TGVqrLGPaoPR6ybUr2dpVDViZ0o_j3KF72xk05nTzuQ",
+          "mode": "list",
+          "cachedResultName": "QA Agency Finance",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TGVqrLGPaoPR6ybUr2dpVDViZ0o_j3KF72xk05nTzuQ/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Income"
+        },
+        "options": {
+          "outputFormatting": {
+            "values": {
+              "general": "UNFORMATTED_VALUE",
+              "date": "FORMATTED_STRING"
+            }
+          }
+        }
+      },
+      "id": "ba8156d0-1b5c-47c9-9e3f-20d88b23c860",
+      "name": "Read QA Finance Income",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        736,
+        -48
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "O6p4zLGYjfEmlppY",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1TGVqrLGPaoPR6ybUr2dpVDViZ0o_j3KF72xk05nTzuQ",
+          "mode": "list",
+          "cachedResultName": "QA Agency Finance",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TGVqrLGPaoPR6ybUr2dpVDViZ0o_j3KF72xk05nTzuQ/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Expenses"
+        },
+        "options": {
+          "outputFormatting": {
+            "values": {
+              "general": "UNFORMATTED_VALUE",
+              "date": "FORMATTED_STRING"
+            }
+          }
+        }
+      },
+      "id": "4f102921-8226-4804-851a-0bc3e280962b",
+      "name": "Read QA Finance Expenses",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        960,
+        -48
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "O6p4zLGYjfEmlppY",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1TGVqrLGPaoPR6ybUr2dpVDViZ0o_j3KF72xk05nTzuQ",
+          "mode": "list",
+          "cachedResultName": "QA Agency Finance",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TGVqrLGPaoPR6ybUr2dpVDViZ0o_j3KF72xk05nTzuQ/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Review Log"
+        },
+        "options": {
+          "outputFormatting": {
+            "values": {
+              "general": "UNFORMATTED_VALUE",
+              "date": "FORMATTED_STRING"
+            }
+          }
+        }
+      },
+      "id": "474684bd-afab-4805-9a3e-cbd407a0b203",
+      "name": "Read QA Finance Review Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1184,
+        -48
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "O6p4zLGYjfEmlppY",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "trashed = false",
+        "returnAll": true,
+        "filter": {
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive",
+            "cachedResultName": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "1V8h-b-0PFrZHGY6FSpK-0cv9ugbML7hm",
+            "mode": "list",
+            "cachedResultName": "QA Unprocessed",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/1V8h-b-0PFrZHGY6FSpK-0cv9ugbML7hm"
+          },
+          "whatToSearch": "all",
+          "includeTrashed": false
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name",
+            "webViewLink",
+            "mimeType"
+          ]
+        }
+      },
+      "id": "e455c46a-ef8e-454b-a5c6-1bcff8fee2da",
+      "name": "Read QA Drive Unprocessed",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1408,
+        -48
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "h8F2U3BNe4eImsg0",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "trashed = false",
+        "returnAll": true,
+        "filter": {
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive",
+            "cachedResultName": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "1BNJKivxOH1ueofWzwSpvVFoJ8YsrhHwP",
+            "mode": "list",
+            "cachedResultName": "QA Processed",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/1BNJKivxOH1ueofWzwSpvVFoJ8YsrhHwP"
+          },
+          "whatToSearch": "files",
+          "includeTrashed": false
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name",
+            "webViewLink",
+            "mimeType"
+          ]
+        }
+      },
+      "id": "d7f0d982-a9ef-49ec-82fc-5ec5111af187",
+      "name": "Read QA Drive Processed",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1632,
+        -48
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "h8F2U3BNe4eImsg0",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "trashed = false",
+        "returnAll": true,
+        "filter": {
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive",
+            "cachedResultName": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "1rqj3N-2Nk3b9bXP_RXDggs4o_kaQWRqd",
+            "cachedResultName": "Needs Review"
+          },
+          "whatToSearch": "files",
+          "includeTrashed": false
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name",
+            "webViewLink",
+            "mimeType"
+          ]
+        }
+      },
+      "id": "71ebc2b7-981f-42ba-b501-ba5ceb1cc8e9",
+      "name": "Read QA Drive Needs Review",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1856,
+        -48
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "h8F2U3BNe4eImsg0",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "trashed = false",
+        "returnAll": true,
+        "filter": {
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive",
+            "cachedResultName": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "16yKduVMwu_VZXgTdiSff0MoHYnGKwi_y",
+            "mode": "list",
+            "cachedResultName": "QA Rejected",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/16yKduVMwu_VZXgTdiSff0MoHYnGKwi_y"
+          },
+          "whatToSearch": "files",
+          "includeTrashed": false
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name",
+            "webViewLink",
+            "mimeType"
+          ]
+        }
+      },
+      "id": "80defa7d-9e58-40ea-bdd7-0aeaad35ddce",
+      "name": "Read QA Drive Rejected",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2080,
+        -48
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "h8F2U3BNe4eImsg0",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": true,
+        "simple": false,
+        "filters": {
+          "q": "in:anywhere subject:\"Please review invoice\" newer_than:14d",
+          "readStatus": "both",
+          "receivedAfter": "2026-11-18T18:00:00"
+        },
+        "options": {
+          "downloadAttachments": false
+        }
+      },
+      "id": "3c70445d-a193-4f5b-9e46-bf89f0c6fb75",
+      "name": "Read QA Review Emails",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2304,
+        -48
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "webhookId": "6201e26e-260f-4287-b130-aa02f91f1297",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "3CzeeAQ9YashoVhe",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "mNumUhKiNnh2vcW7",
+          "cachedResultName": "BoostGrow_QA_GroundTruth"
+        },
+        "filters": {
+          "conditions": []
+        },
+        "returnAll": true
+      },
+      "id": "abf8ef4f-e1da-4fce-bd4f-e023e5504352",
+      "name": "Load Ground Truth (Read Only)",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        -48
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Load QA Manifest": {
+      "main": [
+        [
+          {
+            "node": "Load Ground Truth (Read Only)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare Results Against Ground Truth": {
+      "main": [
+        [
+          {
+            "node": "Update QA Manifest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update QA Manifest": {
+      "main": [
+        [
+          {
+            "node": "Append QA Test Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append QA Test Log": {
+      "main": [
+        [
+          {
+            "node": "Build QA Batch Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start QA Evaluation": {
+      "main": [
+        [
+          {
+            "node": "Load QA Manifest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read QA Finance Income": {
+      "main": [
+        [
+          {
+            "node": "Read QA Finance Expenses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read QA Finance Expenses": {
+      "main": [
+        [
+          {
+            "node": "Read QA Finance Review Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read QA Finance Review Log": {
+      "main": [
+        [
+          {
+            "node": "Read QA Drive Unprocessed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read QA Drive Unprocessed": {
+      "main": [
+        [
+          {
+            "node": "Read QA Drive Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read QA Drive Processed": {
+      "main": [
+        [
+          {
+            "node": "Read QA Drive Needs Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read QA Drive Needs Review": {
+      "main": [
+        [
+          {
+            "node": "Read QA Drive Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read QA Drive Rejected": {
+      "main": [
+        [
+          {
+            "node": "Read QA Review Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read QA Review Emails": {
+      "main": [
+        [
+          {
+            "node": "Compare Results Against Ground Truth",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Ground Truth (Read Only)": {
+      "main": [
+        [
+          {
+            "node": "Read QA Finance Income",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "6695e60f-a587-47b1-a502-84e24c92e89d",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "d2b8e6c52178bdd73565d7e025ad7f1481c5b25b618f5d3abbb9d7f0081fbba5"
+  },
+  "nodeGroups": [
+    {
+      "id": "31c226b9-394f-40ae-b9d8-8a5adf43bc27",
+      "name": "Collect Actual Evidence",
+      "nodeIds": [
+        "ba8156d0-1b5c-47c9-9e3f-20d88b23c860",
+        "4f102921-8226-4804-851a-0bc3e280962b",
+        "474684bd-afab-4805-9a3e-cbd407a0b203",
+        "e455c46a-ef8e-454b-a5c6-1bcff8fee2da",
+        "d7f0d982-a9ef-49ec-82fc-5ec5111af187",
+        "71ebc2b7-981f-42ba-b501-ba5ceb1cc8e9",
+        "80defa7d-9e58-40ea-bdd7-0aeaad35ddce",
+        "3c70445d-a193-4f5b-9e46-bf89f0c6fb75"
+      ],
+      "description": "Reads finance records, file locations and human-review email evidence."
+    },
+    {
+      "id": "37d52172-3154-4ab3-982a-6426073e0edd",
+      "name": "Compare and Report",
+      "nodeIds": [
+        "0f9fdeb4-55b9-452c-8f0c-f00b96f4ac29",
+        "0bbb6ba2-fe72-44fe-9ec4-e399e0e7627e",
+        "c14b454d-a817-4558-8680-f1b13c55c94a",
+        "7078c0ff-168e-42e8-b504-5ae1d559848c"
+      ],
+      "description": "Compares observed outcomes, updates QA results and produces a batch summary."
+    }
+  ],
+  "id": "rOl6lPQC1DPWXmyp",
+  "tags": []
+}

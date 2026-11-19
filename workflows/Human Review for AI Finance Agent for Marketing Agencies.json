@@ -1,0 +1,1127 @@
+{
+  "name": "Human Review for AI Finance Agent for Marketing Agencies",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "file_id"
+            },
+            {
+              "name": "file_name"
+            },
+            {
+              "name": "file_link"
+            },
+            {
+              "name": "review_email"
+            },
+            {
+              "name": "confidence",
+              "type": "number"
+            },
+            {
+              "name": "missing_fields"
+            },
+            {
+              "name": "extracted",
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "id": "92f0b2b4-ff1f-4233-8ac5-e9c314ec254c",
+      "name": "Review Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "={{ $('Review Input').item.json.review_email }}",
+        "subject": "={{ 'Please review invoice: ' + $('Review Input').item.json.file_name }}",
+        "message": "={{ 'The finance agent is not sure about this document and needs your check before saving it.\\n\\nFile: ' + $('Review Input').item.json.file_name + '\\nLink: ' + $('Review Input').item.json.file_link + '\\nSender (issued by): ' + (($('Review Input').item.json.extracted || {}).issued_by || '-') + '\\nBill to: ' + (($('Review Input').item.json.extracted || {}).billed_to || '-') + '\\nAI thinks: ' + (($('Review Input').item.json.extracted || {}).transaction_type || '-') + ' / ' + (($('Review Input').item.json.extracted || {}).category || '-') + '\\nAI confidence: ' + $('Review Input').item.json.confidence + '%\\nMissing fields: ' + ($('Review Input').item.json.missing_fields || 'none') + '\\nAI note: ' + (($('Review Input').item.json.extracted || {}).review_reason || '-') + '\\n\\nOpen the form, correct anything that is wrong, then choose Approve or Reject. If nobody answers within 24 hours the file moves to the Needs Review folder.' }}",
+        "responseType": "customForm",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Approve"
+                  },
+                  {
+                    "option": "Reject"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Transaction Type",
+              "fieldType": "dropdown",
+              "defaultValue": "={{ String(($('Review Input').item.json.extracted || {}).transaction_type || 'expense').toLowerCase() }}",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "income"
+                  },
+                  {
+                    "option": "expense"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Category",
+              "fieldType": "dropdown",
+              "defaultValue": "={{ ($('Review Input').item.json.extracted || {}).category || 'Other Expense' }}",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Marketing Retainer"
+                  },
+                  {
+                    "option": "Social Media Management"
+                  },
+                  {
+                    "option": "SEO"
+                  },
+                  {
+                    "option": "Paid Ads Management"
+                  },
+                  {
+                    "option": "Content & Creative"
+                  },
+                  {
+                    "option": "Web & Design Services"
+                  },
+                  {
+                    "option": "Other Income"
+                  },
+                  {
+                    "option": "Ad Spend"
+                  },
+                  {
+                    "option": "Freelancers & Contractors"
+                  },
+                  {
+                    "option": "Tools & Software"
+                  },
+                  {
+                    "option": "Salaries & Payroll"
+                  },
+                  {
+                    "option": "Office & Rent"
+                  },
+                  {
+                    "option": "Utilities & Bills"
+                  },
+                  {
+                    "option": "Tax"
+                  },
+                  {
+                    "option": "Other Expense"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Party Name",
+              "defaultValue": "={{ ($('Review Input').item.json.extracted || {}).party_name || '' }}",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Invoice Number",
+              "defaultValue": "={{ ($('Review Input').item.json.extracted || {}).invoice_number || '' }}"
+            },
+            {
+              "fieldLabel": "Invoice Date (YYYY-MM-DD)",
+              "defaultValue": "={{ ($('Review Input').item.json.extracted || {}).invoice_date || '' }}",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Due Date (YYYY-MM-DD)",
+              "defaultValue": "={{ ($('Review Input').item.json.extracted || {}).due_date || '' }}"
+            },
+            {
+              "fieldLabel": "Description",
+              "defaultValue": "={{ ($('Review Input').item.json.extracted || {}).description || '' }}"
+            },
+            {
+              "fieldLabel": "Amount Before Tax (USD)",
+              "fieldType": "number",
+              "defaultValue": "={{ ($('Review Input').item.json.extracted || {}).amount_ex_tax ?? '' }}"
+            },
+            {
+              "fieldLabel": "Tax (USD)",
+              "fieldType": "number",
+              "defaultValue": "={{ ($('Review Input').item.json.extracted || {}).tax_amount ?? 0 }}"
+            },
+            {
+              "fieldLabel": "Total (USD)",
+              "fieldType": "number",
+              "defaultValue": "={{ ($('Review Input').item.json.extracted || {}).total_amount ?? '' }}",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Payment Status",
+              "fieldType": "dropdown",
+              "defaultValue": "={{ String(($('Review Input').item.json.extracted || {}).payment_status || 'unpaid').toLowerCase() }}",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "paid"
+                  },
+                  {
+                    "option": "unpaid"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Reviewer Note",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "options": {
+          "messageButtonLabel": "Review invoice",
+          "responseFormTitle": "Review invoice data",
+          "responseFormButtonLabel": "Submit review",
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 24
+            }
+          },
+          "appendAttribution": false
+        }
+      },
+      "id": "62c7ac9d-bac4-483a-a7d1-addbf049e406",
+      "name": "Ask Human to Review",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        288,
+        784
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "webhookId": "ef8c3b51-3de7-47ea-a278-8f2802eef158",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "3CzeeAQ9YashoVhe",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ ($json.data || $json)['Decision'] || '' }}",
+                    "rightValue": "Approve",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "48fdbd27-ffcf-4d09-8e39-35b06ec64808"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Approved"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ ($json.data || $json)['Decision'] || '' }}",
+                    "rightValue": "Reject",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "9ec1e1b0-b076-45c0-b215-eaac15d44ce7"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rejected"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "No response"
+        }
+      },
+      "id": "81c80695-d0c9-4ac9-8696-221103c05a7d",
+      "name": "Human Decision",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        512,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fd-output",
+              "name": "output",
+              "type": "object",
+              "value": "={{ (() => { const f = $json.data || $json; const num = v => { const n = parseFloat(String(v ?? '').replace(/[^0-9.-]/g, '')); return isNaN(n) ? 0 : n; }; return { transaction_type: f['Transaction Type'], category: f['Category'], party_name: f['Party Name'], invoice_number: f['Invoice Number'] || '', invoice_date: f['Invoice Date (YYYY-MM-DD)'], due_date: f['Due Date (YYYY-MM-DD)'] || '', description: f['Description'] || '', amount_ex_tax: num(f['Amount Before Tax (USD)']), tax_amount: num(f['Tax (USD)']), total_amount: num(f['Total (USD)']), payment_status: f['Payment Status'] }; })() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "000bf070-57c6-4796-8a03-81d0b941715b",
+      "name": "Prepare Final Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        816,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ String($json.output.transaction_type || '').trim().toLowerCase() }}",
+              "rightValue": "income",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9df1be2d-f1a5-4f97-b5ab-bc65612ec342",
+      "name": "Is Income?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "13x22HI8juVOPhzA8KXDr0Qkx1jPGdl7LYG3Hqhj-3PI",
+          "cachedResultName": "Agency_Finance_Template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/13x22HI8juVOPhzA8KXDr0Qkx1jPGdl7LYG3Hqhj-3PI/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Income"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date": "={{ $json.output.invoice_date }}",
+            "invoice_number": "={{ $json.output.invoice_number || '' }}",
+            "client": "={{ $json.output.party_name }}",
+            "category": "={{ $json.output.category }}",
+            "description": "={{ $json.output.description }}",
+            "amount_ex_tax": "={{ $json.output.amount_ex_tax }}",
+            "tax": "={{ $json.output.tax_amount }}",
+            "total_usd": "={{ $json.output.total_amount }}",
+            "status": "={{ $json.output.payment_status }}",
+            "due_date": "={{ $json.output.due_date || '' }}",
+            "file_link": "={{ $('Review Input').item.json.file_link }}",
+            "logged_at": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "invoice_number",
+              "displayName": "invoice_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "client",
+              "displayName": "client",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "amount_ex_tax",
+              "displayName": "amount_ex_tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tax",
+              "displayName": "tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total_usd",
+              "displayName": "total_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "file_link",
+              "displayName": "file_link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "logged_at",
+              "displayName": "logged_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "78bcec8a-d7a3-462c-a364-305b088eadfc",
+      "name": "Log Income",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1264,
+        128
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "O6p4zLGYjfEmlppY",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "move",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Review Input').item.json.file_id }}"
+        },
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1mS50nNM72rN52YVpfJ2QuLFsXNnP0P8d",
+          "mode": "list",
+          "cachedResultName": "Invoice Processed"
+        }
+      },
+      "id": "5fe77138-9eb4-4222-b32d-9acae6838e34",
+      "name": "Move to Processed Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1488,
+        224
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "h8F2U3BNe4eImsg0",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "13x22HI8juVOPhzA8KXDr0Qkx1jPGdl7LYG3Hqhj-3PI",
+          "cachedResultName": "Agency_Finance_Template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/13x22HI8juVOPhzA8KXDr0Qkx1jPGdl7LYG3Hqhj-3PI/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Expenses"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date": "={{ $json.output.invoice_date }}",
+            "invoice_number": "={{ $json.output.invoice_number || '' }}",
+            "vendor": "={{ $json.output.party_name }}",
+            "category": "={{ $json.output.category }}",
+            "description": "={{ $json.output.description }}",
+            "amount_ex_tax": "={{ $json.output.amount_ex_tax }}",
+            "tax": "={{ $json.output.tax_amount }}",
+            "total_usd": "={{ $json.output.total_amount }}",
+            "status": "={{ $json.output.payment_status }}",
+            "file_link": "={{ $('Review Input').item.json.file_link }}",
+            "logged_at": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}"
+          },
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "invoice_number",
+              "displayName": "invoice_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "vendor",
+              "displayName": "vendor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "amount_ex_tax",
+              "displayName": "amount_ex_tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tax",
+              "displayName": "tax",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total_usd",
+              "displayName": "total_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "file_link",
+              "displayName": "file_link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "logged_at",
+              "displayName": "logged_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "60c2b1e3-5e77-4c2a-8fef-0077d1c9d68b",
+      "name": "Log Expense",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1264,
+        320
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "O6p4zLGYjfEmlppY",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "13x22HI8juVOPhzA8KXDr0Qkx1jPGdl7LYG3Hqhj-3PI",
+          "cachedResultName": "Agency_Finance_Template",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/13x22HI8juVOPhzA8KXDr0Qkx1jPGdl7LYG3Hqhj-3PI/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Review Log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "reviewed_at": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}",
+            "file_name": "={{ $('Review Input').item.json.file_name }}",
+            "file_link": "={{ $('Review Input').item.json.file_link }}",
+            "decision": "rejected",
+            "reviewer_note": "={{ ($json.data || $json)['Reviewer Note'] || '' }}",
+            "ai_confidence": "={{ $('Review Input').item.json.confidence }}",
+            "ai_party": "={{ ($('Review Input').item.json.extracted || {}).party_name || '' }}",
+            "ai_total_usd": "={{ ($('Review Input').item.json.extracted || {}).total_amount ?? '' }}"
+          },
+          "schema": [
+            {
+              "id": "reviewed_at",
+              "displayName": "reviewed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "file_name",
+              "displayName": "file_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "file_link",
+              "displayName": "file_link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision",
+              "displayName": "decision",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reviewer_note",
+              "displayName": "reviewer_note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ai_confidence",
+              "displayName": "ai_confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ai_party",
+              "displayName": "ai_party",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ai_total_usd",
+              "displayName": "ai_total_usd",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "873ba5ce-e8dd-4ab5-9a99-cc00790b4c39",
+      "name": "Log Rejection",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1056,
+        768
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "O6p4zLGYjfEmlppY",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "move",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Review Input').item.json.file_id }}"
+        },
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1yPER0ftS-0XcdoSZgx2ijwD-XMehwH-q",
+          "mode": "list",
+          "cachedResultName": "Invoice Rejected",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1yPER0ftS-0XcdoSZgx2ijwD-XMehwH-q"
+        }
+      },
+      "id": "5b8f7077-9838-4a37-bc51-6c59ddc59fb1",
+      "name": "Move to Rejected Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1280,
+        768
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "h8F2U3BNe4eImsg0",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Review Input').item.json.review_email }}",
+        "subject": "={{ 'No review received: ' + $('Review Input').item.json.file_name }}",
+        "message": "={{ '<p>Nobody reviewed this file within 24 hours, so nothing was logged. It was moved to the <b>Needs Review</b> folder.</p><p><b>File:</b> ' + $('Review Input').item.json.file_name + '<br><b>Link:</b> <a href=\"' + $('Review Input').item.json.file_link + '\">Open file</a></p>' }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "311f18e1-94cb-46ba-8131-206704ed67a9",
+      "name": "No Reply Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1056,
+        960
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "webhookId": "d612d0ae-6482-49fe-b351-47e28406d9f0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "3CzeeAQ9YashoVhe",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "move",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Review Input').item.json.file_id }}"
+        },
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1U_9IAUc1vSzcpi_K0xS3ADzqLs1cKXdm",
+          "mode": "list",
+          "cachedResultName": "Needs Review"
+        }
+      },
+      "id": "5e68d67b-7549-45e9-9024-9a90bbee0d62",
+      "name": "Move to Needs Review Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1280,
+        960
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "h8F2U3BNe4eImsg0",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Human Review (sub-workflow)\nCalled by **document-agent** whenever the AI is not sure: low confidence, missing fields, or unclear income vs expense.\n\nRuns separately, so the main workflow keeps processing other files while this one waits.\n\n**Approve** - reviewer-corrected data is logged to Income or Expenses, file moves to Processed.\n**Reject** - logged in the Review Log tab, file moves to Rejected.\n**No reply in 24h** - nothing is logged, reviewer is alerted, file moves to Needs Review.",
+        "height": 360,
+        "width": 480,
+        "color": 4
+      },
+      "id": "0879a0fd-07c2-41fb-b320-0c4dfcf2fdee",
+      "name": "Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        96,
+        128
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Review Input": {
+      "main": [
+        [
+          {
+            "node": "Ask Human to Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Human to Review": {
+      "main": [
+        [
+          {
+            "node": "Human Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human Decision": {
+      "main": [
+        [
+          {
+            "node": "Prepare Final Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Rejection",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Reply Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Final Data": {
+      "main": [
+        [
+          {
+            "node": "Is Income?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Income?": {
+      "main": [
+        [
+          {
+            "node": "Log Income",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Expense",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Income": {
+      "main": [
+        [
+          {
+            "node": "Move to Processed Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Expense": {
+      "main": [
+        [
+          {
+            "node": "Move to Processed Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Rejection": {
+      "main": [
+        [
+          {
+            "node": "Move to Rejected Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Reply Alert": {
+      "main": [
+        [
+          {
+            "node": "Move to Needs Review Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "045e3ff9-fefe-4455-b750-c2bd571e7551",
+  "meta": {
+    "instanceId": "d2b8e6c52178bdd73565d7e025ad7f1481c5b25b618f5d3abbb9d7f0081fbba5"
+  },
+  "nodeGroups": [
+    {
+      "id": "6869fd0c-5d42-478b-b625-28620a3c3aa7",
+      "name": "Get reviewer decision",
+      "nodeIds": [
+        "62c7ac9d-bac4-483a-a7d1-addbf049e406",
+        "81c80695-d0c9-4ac9-8696-221103c05a7d"
+      ],
+      "description": "Emails the reviewer an editable form and waits up to 24 hours for Approve, Reject or no reply"
+    },
+    {
+      "id": "e2b8d0fc-291d-44f1-9cb2-a0d42a21c821",
+      "name": "Save approved invoice",
+      "nodeIds": [
+        "000bf070-57c6-4796-8a03-81d0b941715b",
+        "9df1be2d-f1a5-4f97-b5ab-bc65612ec342",
+        "78bcec8a-d7a3-462c-a364-305b088eadfc",
+        "60c2b1e3-5e77-4c2a-8fef-0077d1c9d68b",
+        "5fe77138-9eb4-4222-b32d-9acae6838e34"
+      ],
+      "description": "Uses the reviewer-corrected values, adds them to the Income or Expenses tab, then files the document as processed"
+    },
+    {
+      "id": "b8c7ec2c-0b93-4c04-a7e8-860d55e6b0f9",
+      "name": "Handle rejection",
+      "nodeIds": [
+        "873ba5ce-e8dd-4ab5-9a99-cc00790b4c39",
+        "5b8f7077-9838-4a37-bc51-6c59ddc59fb1"
+      ],
+      "description": "Records the rejection in the Review Log tab and moves the file out of the unprocessed folder"
+    },
+    {
+      "id": "336eb279-4fa6-4bde-bb4f-d9d66fd3b3b1",
+      "name": "Handle missing reply",
+      "nodeIds": [
+        "311f18e1-94cb-46ba-8131-206704ed67a9",
+        "5e68d67b-7549-45e9-9024-9a90bbee0d62"
+      ],
+      "description": "After 24 hours with no answer, nothing is logged; the reviewer is told and the file goes to Needs Review"
+    }
+  ],
+  "id": "wWXisTwrloQiIDGT",
+  "tags": []
+}
